@@ -23,6 +23,8 @@ const initialEntries: FinancialEntry[] = [];
 interface FinanceStore {
   accountConfig: AccountConfig;
   entries: FinancialEntry[];
+  hasCompletedOnboarding: boolean;
+  completeOnboarding: () => void;
   updateAccountConfig: (partial: Partial<AccountConfig>) => void;
   setMonthlyDailyBudget: (valueCents: number) => void;
   setCurrentBalance: (valueCents: number) => void;
@@ -38,6 +40,9 @@ interface FinanceStore {
 export const useFinanceStore = create<FinanceStore>((set) => ({
   accountConfig: initialConfig,
   entries: initialEntries,
+  hasCompletedOnboarding: false,
+
+  completeOnboarding: () => set({ hasCompletedOnboarding: true }),
 
   updateAccountConfig: (partial) =>
     set((state) => ({

@@ -17,6 +17,8 @@ const DISPLAY_ORDER: TransactionType[] = [
   'credit_card',
 ];
 
+// ─── Date helpers ───────────────────────────────────────────
+
 function parseDate(date: string) {
   const [year, month, day] = date.split('-').map(Number);
   return new Date(year, month - 1, day);
@@ -47,14 +49,6 @@ function addMonths(date: Date, amount: number) {
   return new Date(date.getFullYear(), date.getMonth() + amount, 1);
 }
 
-function minDate(a: Date, b: Date) {
-  return a <= b ? a : b;
-}
-
-function maxDate(a: Date, b: Date) {
-  return a >= b ? a : b;
-}
-
 function sameMonth(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 }
@@ -75,6 +69,12 @@ function clampDay(year: number, monthIndex: number, dayOfMonth: number) {
 function isWithinRange(date: Date, start: Date, end: Date) {
   return date >= start && date <= end;
 }
+
+function isBefore(a: Date, b: Date) {
+  return a < b && !sameDay(a, b);
+}
+
+// ─── Entry expansion ────────────────────────────────────────
 
 function expandEntriesForRange(
   entries: FinancialEntry[],
@@ -97,7 +97,9 @@ function expandEntriesForRange(
     }
 
     const firstDate = parseDate(entry.effectiveDate);
-    const cursor = startOfMonth(maxDate(startOfMonth(firstDate), startOfMonth(start)));
+    const cursor = startOfMonth(
+      firstDate >= start ? firstDate : start,
+    );
     const limit = startOfMonth(end);
 
     while (cursor <= limit) {
@@ -129,6 +131,8 @@ function expandEntriesForRange(
   return expanded;
 }
 
+// ─── Core calculations ──────────────────────────────────────
+
 export function computeDailyBudget(monthlyDailyBudgetCents: number) {
   return Math.round(monthlyDailyBudgetCents / 30);
 }
@@ -147,21 +151,36 @@ function computeRiskLevel(
   closingBalance: number,
   warningThresholdCents: number,
 ): RiskLevel {
-  if (closingBalance < 0) {
-    return 'danger';
-  }
-  if (closingBalance <= warningThresholdCents) {
-    return 'warning';
-  }
+  if (closingBalance < 0) return 'danger';
+  if (closingBalance <= warningThresholdCents) return 'warning';
   return 'safe';
 }
 
+const EMPTY_TYPES: [DayTypeAmount, DayTypeAmount, DayTypeAmount, DayTypeAmount, DayTypeAmount] =
+  DISPLAY_ORDER.map((type) => ({
+    type,
+    amountCents: 0,
+    isProjected: false,
+  })) as [DayTypeAmount, DayTypeAmount, DayTypeAmount, DayTypeAmount, DayTypeAmount];
+
+/**
+ * Build the 5-element types tuple for a single day.
+ *
+ * CRITICAL RULE: days BEFORE the anchor date have NO data and NO projections.
+ * The user only started tracking from anchor date onward.
+ * The configured balance is the opening balance of the anchor date.
+ */
 function buildDayTypes(
   entriesForDay: FinancialEntry[],
   dailyBudgetCents: number,
   currentDate: Date,
   anchorDate: Date,
 ): [DayTypeAmount, DayTypeAmount, DayTypeAmount, DayTypeAmount, DayTypeAmount] {
+  // ── Before anchor: no data exists ──
+  if (isBefore(currentDate, anchorDate)) {
+    return EMPTY_TYPES;
+  }
+
   const totals = new Map<TransactionType, number>(
     DISPLAY_ORDER.map((type) => [type, 0]),
   );
@@ -172,6 +191,11 @@ function buildDayTypes(
 
   const actualDailyExpense = totals.get('daily_expense') ?? 0;
   const hasRealDailyExpense = actualDailyExpense > 0;
+
+  // Project daily budget on days from anchor onward when:
+  // 1. No real daily expense was logged
+  // 2. Budget is configured
+  // 3. It's NOT the anchor date itself (anchor day = "today", user hasn't spent yet or will log)
   const shouldProjectDaily =
     !hasRealDailyExpense &&
     dailyBudgetCents > 0 &&
@@ -204,91 +228,124 @@ function getNetEffect(types: DailyBalanceRow['types']) {
   const daily = types[2].amountCents;
   const saving = types[3].amountCents;
   const creditCard = types[4].amountCents;
-
   return income - fixed - daily - saving - creditCard;
 }
 
-function getAnchorAdjustedMonthOpening(
-  config: AccountConfig,
-  monthStart: Date,
-  expandedEntries: FinancialEntry[],
-): number {
-  const anchorDate = parseDate(config.balanceAnchorDate);
-  const anchorBalance = config.currentBalanceCents;
-  const dailyBudgetCents = computeDailyBudget(config.monthlyDailyBudgetCents);
-  const entriesByDate = groupEntriesByDate(expandedEntries);
+// ─── Ledger builder ─────────────────────────────────────────
 
-  if (monthStart > anchorDate) {
-    return anchorBalance;
-  }
-
-  let totalEffectUntilAnchor = 0;
-  let cursor = monthStart;
-
-  while (cursor <= anchorDate) {
-    const types = buildDayTypes(
-      entriesByDate.get(formatDate(cursor)) ?? [],
-      dailyBudgetCents,
-      cursor,
-      anchorDate,
-    );
-    totalEffectUntilAnchor += getNetEffect(types);
-    cursor = addDays(cursor, 1);
-  }
-
-  return anchorBalance - totalEffectUntilAnchor;
-}
-
+/**
+ * Build the daily ledger for a given month.
+ *
+ * The anchor date divides time into two zones:
+ * - BEFORE anchor: all types = 0, closing balance = configured balance (static)
+ * - FROM anchor onward: real entries + projections, balance evolves
+ *
+ * For months entirely after anchor month: opening = end of previous month.
+ * For the anchor month: opening = configured balance on anchor date.
+ */
 export function buildDailyLedger(
   config: AccountConfig,
   selectedMonth: Date,
   entries: FinancialEntry[],
 ): DailyBalanceRow[] {
   const anchorDate = parseDate(config.balanceAnchorDate);
+  const anchorBalance = config.currentBalanceCents;
+  const dailyBudgetCents = computeDailyBudget(config.monthlyDailyBudgetCents);
   const monthStart = startOfMonth(selectedMonth);
   const monthEnd = endOfMonth(selectedMonth);
-  const earliestMonthStart = startOfMonth(minDate(monthStart, anchorDate));
-  const expandedEntries = expandEntriesForRange(entries, earliestMonthStart, monthEnd);
+
+  // Expand entries for the range we need
+  const expandedEntries = expandEntriesForRange(entries, monthStart, monthEnd);
   const entriesByDate = groupEntriesByDate(expandedEntries);
-  const dailyBudgetCents = computeDailyBudget(config.monthlyDailyBudgetCents);
 
-  let runningBalance = getAnchorAdjustedMonthOpening(
-    config,
-    earliestMonthStart,
-    expandedEntries,
-  );
+  // Determine opening balance for this month
+  let runningBalance: number;
 
-  const allRows: DailyBalanceRow[] = [];
-  let cursor = earliestMonthStart;
+  if (sameMonth(selectedMonth, anchorDate)) {
+    // Anchor month: balance before anchor is static at anchor value
+    runningBalance = anchorBalance;
+  } else if (monthStart > anchorDate) {
+    // Future month: compute by running through all months from anchor forward
+    const prevMonthEnd = endOfMonth(addMonths(monthStart, -1));
+    const bridgeEntries = expandEntriesForRange(entries, anchorDate, prevMonthEnd);
+    const bridgeByDate = groupEntriesByDate(bridgeEntries);
+
+    runningBalance = anchorBalance;
+    let cursor = anchorDate;
+    while (cursor <= prevMonthEnd) {
+      const types = buildDayTypes(
+        bridgeByDate.get(formatDate(cursor)) ?? [],
+        dailyBudgetCents,
+        cursor,
+        anchorDate,
+      );
+      runningBalance += getNetEffect(types);
+      cursor = addDays(cursor, 1);
+    }
+  } else {
+    // Month before anchor: all static, no data
+    runningBalance = anchorBalance;
+  }
+
+  // Build day-by-day rows
+  const rows: DailyBalanceRow[] = [];
+  let cursor = monthStart;
+
+  // For anchor month, pre-anchor days are static
+  const isAnchorMonth = sameMonth(selectedMonth, anchorDate);
 
   while (cursor <= monthEnd) {
     const dateKey = formatDate(cursor);
-    const types = buildDayTypes(
-      entriesByDate.get(dateKey) ?? [],
-      dailyBudgetCents,
-      cursor,
-      anchorDate,
-    );
-    const openingBalance = runningBalance;
-    runningBalance += getNetEffect(types);
+    const isBeforeAnchor = isBefore(cursor, anchorDate);
 
-    allRows.push({
-      day: cursor.getDate(),
-      date: dateKey,
-      types,
-      openingBalance,
-      closingBalance: runningBalance,
-      riskLevel: computeRiskLevel(runningBalance, config.warningThresholdCents),
-    });
+    if (isAnchorMonth && isBeforeAnchor) {
+      // Pre-anchor: static row with no data
+      rows.push({
+        day: cursor.getDate(),
+        date: dateKey,
+        types: EMPTY_TYPES,
+        openingBalance: anchorBalance,
+        closingBalance: anchorBalance,
+        riskLevel: computeRiskLevel(anchorBalance, config.warningThresholdCents),
+      });
+    } else if (!isAnchorMonth && monthStart < anchorDate) {
+      // Entire month before anchor: static
+      rows.push({
+        day: cursor.getDate(),
+        date: dateKey,
+        types: EMPTY_TYPES,
+        openingBalance: anchorBalance,
+        closingBalance: anchorBalance,
+        riskLevel: computeRiskLevel(anchorBalance, config.warningThresholdCents),
+      });
+    } else {
+      // From anchor date onward: compute normally
+      const types = buildDayTypes(
+        entriesByDate.get(dateKey) ?? [],
+        dailyBudgetCents,
+        cursor,
+        anchorDate,
+      );
+      const openingBalance = runningBalance;
+      runningBalance += getNetEffect(types);
+
+      rows.push({
+        day: cursor.getDate(),
+        date: dateKey,
+        types,
+        openingBalance,
+        closingBalance: runningBalance,
+        riskLevel: computeRiskLevel(runningBalance, config.warningThresholdCents),
+      });
+    }
 
     cursor = addDays(cursor, 1);
   }
 
-  return allRows.filter((row) => {
-    const rowDate = parseDate(row.date);
-    return sameMonth(rowDate, selectedMonth);
-  });
+  return rows;
 }
+
+// ─── Monthly totals ─────────────────────────────────────────
 
 export function buildMonthlyTotals(
   config: AccountConfig,
@@ -297,19 +354,16 @@ export function buildMonthlyTotals(
 ): MonthlySummaryData {
   const dailyBudgetTarget = computeDailyBudget(config.monthlyDailyBudgetCents);
   const anchorDate = parseDate(config.balanceAnchorDate);
-  const selectedMonthEnd = endOfMonth(selectedMonth);
-  const monthIsCurrentOrFuture = selectedMonthEnd >= anchorDate;
-  const effectiveElapsedDays = sameMonth(selectedMonth, anchorDate)
-    ? anchorDate.getDate()
-    : selectedMonth < anchorDate
-      ? selectedMonthEnd.getDate()
-      : 0;
+
+  // Count only days from anchor onward for averages
+  let elapsedDays = 0;
+  const today = new Date();
 
   const totals = {
     income: 0,
     fixed_expense: 0,
     daily_expense_real: 0,
-    daily_expense_projected_remaining: 0,
+    daily_expense_projected: 0,
     saving: 0,
     credit_card: 0,
   };
@@ -318,26 +372,28 @@ export function buildMonthlyTotals(
     const rowDate = parseDate(row.date);
     const [income, fixedExpense, dailyExpense, saving, creditCard] = row.types;
 
+    // Skip pre-anchor days (they're empty)
+    if (isBefore(rowDate, anchorDate)) continue;
+
     totals.income += income.amountCents;
     totals.fixed_expense += fixedExpense.amountCents;
     totals.saving += saving.amountCents;
     totals.credit_card += creditCard.amountCents;
 
     if (dailyExpense.isProjected) {
-      if (
-        rowDate > anchorDate ||
-        (!sameMonth(selectedMonth, anchorDate) && monthIsCurrentOrFuture)
-      ) {
-        totals.daily_expense_projected_remaining += dailyExpense.amountCents;
-      }
+      totals.daily_expense_projected += dailyExpense.amountCents;
     } else {
       totals.daily_expense_real += dailyExpense.amountCents;
+      // Count elapsed days: anchor date up to today (not future)
+      if (rowDate <= today) {
+        elapsedDays++;
+      }
     }
   }
 
   const averageDailySpend =
-    effectiveElapsedDays > 0
-      ? Math.round(totals.daily_expense_real / effectiveElapsedDays)
+    elapsedDays > 0
+      ? Math.round(totals.daily_expense_real / elapsedDays)
       : 0;
 
   const performance =
@@ -346,13 +402,13 @@ export function buildMonthlyTotals(
     totals.daily_expense_real -
     totals.saving -
     totals.credit_card -
-    totals.daily_expense_projected_remaining;
+    totals.daily_expense_projected;
 
   const costOfLife =
     totals.fixed_expense +
     totals.daily_expense_real +
     totals.credit_card +
-    totals.daily_expense_projected_remaining;
+    totals.daily_expense_projected;
 
   const economized =
     totals.income > 0 ? totals.saving / totals.income : 0;
@@ -361,7 +417,7 @@ export function buildMonthlyTotals(
     currentBalance: config.currentBalanceCents,
     monthlyDailyBudget: config.monthlyDailyBudgetCents,
     dailyBudgetTarget,
-    dailyProjectedRemaining: totals.daily_expense_projected_remaining,
+    dailyProjectedRemaining: totals.daily_expense_projected,
     performance,
     performanceLabel: performance < 0 ? 'Faltou dinheiro' : 'Sobrou dinheiro',
     economized,
@@ -377,13 +433,15 @@ export function buildMonthlyTotals(
     dailyAverage: averageDailySpend,
     movements: {
       income: totals.income,
-      fixed_expense: Math.abs(totals.fixed_expense),
-      daily_expense: Math.abs(totals.daily_expense_real),
-      saving: Math.abs(totals.saving),
-      credit_card: Math.abs(totals.credit_card),
+      fixed_expense: totals.fixed_expense,
+      daily_expense: totals.daily_expense_real,
+      saving: totals.saving,
+      credit_card: totals.credit_card,
     },
   };
 }
+
+// ─── Horizon ────────────────────────────────────────────────
 
 export function buildHorizon(
   config: AccountConfig,

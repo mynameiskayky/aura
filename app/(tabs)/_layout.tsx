@@ -1,12 +1,19 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { CustomTabBar } from '@/components/navigation/CustomTabBar';
 import { AddTransactionSheet } from '@/components/sheets/AddTransactionSheet';
+import { useFinanceStore } from '@/stores/finance-store';
 
 export const unstable_settings = {
   initialRouteName: 'saldos',
 };
 
 export default function TabsLayout() {
+  const hasCompletedOnboarding = useFinanceStore((state) => state.hasCompletedOnboarding);
+
+  if (!hasCompletedOnboarding) {
+    return <Redirect href="/onboarding" />;
+  }
+
   return (
     <>
       <Tabs
