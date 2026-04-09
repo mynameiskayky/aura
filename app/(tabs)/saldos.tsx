@@ -1,95 +1,181 @@
-import { View, Text } from 'react-native';
+import React, { useCallback } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
-import { useCallback } from 'react';
 import { Screen } from '@/components/ui';
-import { MonthHeader, TypeBadge } from '@/components/finance';
+import { MonthHeader, TypeBadge, FilterRow } from '@/components/finance';
 import { MOCK_BALANCES } from '@/mocks/balances';
 import { formatCurrency } from '@/core/utils/currency';
-import type { DailyBalanceRow, TransactionType } from '@/core/types';
+import { colors } from '@/theme/colors';
+import type { DailyBalanceRow, DayTypeAmount, TransactionType } from '@/core/types';
 
-const ALL_TYPES: TransactionType[] = ['income', 'fixed_expense', 'daily_expense', 'saving', 'credit_card'];
+const TYPE_ORDER: TransactionType[] = [
+  'income',
+  'fixed_expense',
+  'daily_expense',
+  'saving',
+  'credit_card',
+];
 
-function BalanceRow({ item }: { item: DailyBalanceRow }) {
+const TYPE_ROW_HEIGHT = 36;
+const DAY_GROUP_HEIGHT = TYPE_ROW_HEIGHT * 5;
+
+/** Single type row inside a day group: badge + amount */
+const TypeRow = React.memo(function TypeRow({
+  entry,
+}: {
+  entry: DayTypeAmount;
+}) {
+  const hasValue = entry.amountCents > 0;
+  const textColor = hasValue ? colors.textPrimary : 'rgba(255,255,255,0.28)';
+
+  return (
+    <View style={styles.typeRow}>
+      <TypeBadge
+        type={entry.type}
+        size="sm"
+        disabled={!hasValue}
+      />
+      <Text
+        style={[styles.typeAmount, { color: textColor }]}
+        numberOfLines={1}
+      >
+        {formatCurrency(entry.amountCents)}
+      </Text>
+    </View>
+  );
+});
+
+/** Full day group: day number (left) | 5 type rows (center) | balance (right) */
+const DayGroup = React.memo(function DayGroup({
+  item,
+}: {
+  item: DailyBalanceRow;
+}) {
   const isNegative = item.closingBalance < 0;
   const isDanger = item.riskLevel === 'danger';
 
   return (
-    <View className="flex-row items-center px-s3 py-2 border-b border-border-subtle">
-      {/* Day column */}
-      <View className="w-10 items-center">
-        <Text className="text-body font-bold text-text-secondary">{item.day}</Text>
+    <View style={styles.dayGroup}>
+      {/* Day number column */}
+      <View style={styles.dayCol}>
+        <Text style={styles.dayText}>{item.day}</Text>
       </View>
 
-      {/* Entries column */}
-      <View className="flex-1 flex-row items-center gap-1 px-2">
-        {ALL_TYPES.map((type) => {
-          const entry = item.entries.find((e) => e.type === type);
-          const hasEntry = !!entry;
-          return (
-            <View key={type} className="items-center">
-              <TypeBadge type={type} size="sm" disabled={!hasEntry} />
-              {hasEntry && (
-                <Text
-                  className="text-[9px] mt-0.5 font-semibold"
-                  style={{ color: hasEntry ? undefined : 'rgba(255,255,255,0.25)' }}
-                >
-                  {formatCurrency(entry.amount)}
-                </Text>
-              )}
-            </View>
-          );
-        })}
+      {/* Vertical separator */}
+      <View style={styles.vSeparator} />
+
+      {/* Types column: 5 stacked rows */}
+      <View style={styles.typesCol}>
+        {item.types.map((entry) => (
+          <TypeRow key={entry.type} entry={entry} />
+        ))}
       </View>
 
-      {/* Balance column */}
+      {/* Vertical separator */}
+      <View style={styles.vSeparator} />
+
+      {/* Balance column (spans full height) */}
       <View
-        className={`w-28 items-end py-2 px-2 rounded-sm ${
-          isDanger ? 'bg-danger-balance' : ''
-        }`}
+        style={[
+          styles.balanceCol,
+          isDanger && { backgroundColor: colors.dangerBalance },
+        ]}
       >
         <Text
-          className={`text-body font-bold ${
-            isNegative ? 'text-white' : 'text-text-primary'
-          }`}
+          style={[
+            styles.balanceText,
+            isNegative && { color: '#FFFFFF' },
+          ]}
+          numberOfLines={1}
         >
           {formatCurrency(item.closingBalance)}
         </Text>
       </View>
     </View>
   );
-}
+});
 
 export default function SaldosScreen() {
   const router = useRouter();
 
   const renderItem = useCallback(
-    ({ item }: { item: DailyBalanceRow }) => <BalanceRow item={item} />,
-    []
+    ({ item }: { item: DailyBalanceRow }) => <DayGroup item={item} />,
+    [],
   );
 
   return (
     <Screen withTabBarInset>
       <MonthHeader onGridPress={() => router.push('/horizon')} />
+      <FilterRow />
 
-      {/* Column headers */}
-      <View className="flex-row px-s3 py-s1 border-b border-border-strong">
-        <View className="w-10 items-center">
-          <Text className="text-overline text-text-muted">DIA</Text>
-        </View>
-        <View className="flex-1 px-2">
-          <Text className="text-overline text-text-muted">LANÇAMENTOS</Text>
-        </View>
-        <View className="w-28 items-end px-2">
-          <Text className="text-overline text-text-muted">SALDOS</Text>
-        </View>
-      </View>
+      {/* Horizontal divider */}
+      <View style={styles.hDivider} />
 
       <FlashList
         data={MOCK_BALANCES}
         renderItem={renderItem}
         keyExtractor={(item) => item.date}
+        ItemSeparatorComponent={HorizontalDivider}
       />
     </Screen>
   );
 }
+
+function HorizontalDivider() {
+  return <View style={styles.hDivider} />;
+}
+
+const styles = StyleSheet.create({
+  dayGroup: {
+    flexDirection: 'row',
+    minHeight: DAY_GROUP_HEIGHT,
+  },
+  dayCol: {
+    width: 46,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dayText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  vSeparator: {
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  typesCol: {
+    flex: 1,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+  },
+  typeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: TYPE_ROW_HEIGHT,
+    gap: 10,
+  },
+  typeAmount: {
+    fontSize: 14,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
+  balanceCol: {
+    width: 130,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingRight: 16,
+    paddingLeft: 8,
+  },
+  balanceText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    fontVariant: ['tabular-nums'],
+  },
+  hDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+});

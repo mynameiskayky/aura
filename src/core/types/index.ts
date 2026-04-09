@@ -2,18 +2,23 @@ export type TransactionType = 'income' | 'fixed_expense' | 'daily_expense' | 'sa
 
 export type RiskLevel = 'safe' | 'warning' | 'danger';
 
+/** Each day has exactly 5 type rows (one per TransactionType) */
+export interface DayTypeAmount {
+  type: TransactionType;
+  /** Amount in cents (absolute). 0 means no activity. */
+  amountCents: number;
+  /** true = system-projected daily budget, not real spend */
+  isProjected: boolean;
+}
+
 export interface DailyBalanceRow {
   day: number;
   date: string;
-  entries: DayEntry[];
+  /** Always 5 entries, one per type, in display order */
+  types: [DayTypeAmount, DayTypeAmount, DayTypeAmount, DayTypeAmount, DayTypeAmount];
+  /** Closing balance in cents (can be negative) */
   closingBalance: number;
   riskLevel: RiskLevel;
-}
-
-export interface DayEntry {
-  type: TransactionType;
-  amount: number;
-  isProjected: boolean;
 }
 
 export interface MonthlySummaryData {
@@ -40,4 +45,9 @@ export interface MenuItem {
   icon: string;
   label: string;
   route?: string;
+}
+
+export interface HorizonMonth {
+  monthLabel: string;
+  dailyBalances: number[];
 }

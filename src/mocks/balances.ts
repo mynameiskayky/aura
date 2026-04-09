@@ -1,295 +1,104 @@
-import type { DailyBalanceRow } from '../core/types';
+import type { DailyBalanceRow, DayTypeAmount } from '../core/types';
+
+const DAILY_BUDGET = 5333; // R$ 53.33 projected daily expense
+
+/** Shorthand: builds the 5-element types tuple for a day. */
+function types(
+  overrides: Partial<
+    Record<
+      'income' | 'fixed_expense' | 'daily_expense' | 'saving' | 'credit_card',
+      Pick<DayTypeAmount, 'amountCents' | 'isProjected'>
+    >
+  > = {},
+): [DayTypeAmount, DayTypeAmount, DayTypeAmount, DayTypeAmount, DayTypeAmount] {
+  return [
+    { type: 'income', amountCents: overrides.income?.amountCents ?? 0, isProjected: overrides.income?.isProjected ?? false },
+    { type: 'fixed_expense', amountCents: overrides.fixed_expense?.amountCents ?? 0, isProjected: overrides.fixed_expense?.isProjected ?? false },
+    { type: 'daily_expense', amountCents: overrides.daily_expense?.amountCents ?? DAILY_BUDGET, isProjected: overrides.daily_expense?.isProjected ?? true },
+    { type: 'saving', amountCents: overrides.saving?.amountCents ?? 0, isProjected: overrides.saving?.isProjected ?? false },
+    { type: 'credit_card', amountCents: overrides.credit_card?.amountCents ?? 0, isProjected: overrides.credit_card?.isProjected ?? false },
+  ];
+}
+
+function row(
+  day: number,
+  closingBalance: number,
+  riskLevel: 'safe' | 'warning' | 'danger' = 'danger',
+  overrides: Parameters<typeof types>[0] = {},
+): DailyBalanceRow {
+  return {
+    day,
+    date: `2026-12-${String(day).padStart(2, '0')}`,
+    types: types(overrides),
+    closingBalance,
+    riskLevel,
+  };
+}
 
 export const MOCK_BALANCES: DailyBalanceRow[] = [
-  {
-    day: 1,
-    date: '01/04',
-    entries: [
-      { type: 'income', amount: 320000, isProjected: false },
-      { type: 'fixed_expense', amount: -150000, isProjected: false },
-      { type: 'fixed_expense', amount: -89900, isProjected: false },
-    ],
-    closingBalance: 80100,
-    riskLevel: 'safe',
-  },
-  {
-    day: 2,
-    date: '02/04',
-    entries: [
-      { type: 'daily_expense', amount: -4500, isProjected: false },
-      { type: 'daily_expense', amount: -2390, isProjected: false },
-    ],
-    closingBalance: 73210,
-    riskLevel: 'safe',
-  },
-  {
-    day: 3,
-    date: '03/04',
-    entries: [
-      { type: 'daily_expense', amount: -8900, isProjected: false },
-      { type: 'daily_expense', amount: -3200, isProjected: false },
-      { type: 'daily_expense', amount: -1500, isProjected: false },
-    ],
-    closingBalance: 59610,
-    riskLevel: 'safe',
-  },
-  {
-    day: 4,
-    date: '04/04',
-    entries: [
-      { type: 'daily_expense', amount: -5333, isProjected: true },
-    ],
-    closingBalance: 54277,
-    riskLevel: 'safe',
-  },
-  {
-    day: 5,
-    date: '05/04',
-    entries: [
-      { type: 'credit_card', amount: -42000, isProjected: false },
-      { type: 'daily_expense', amount: -6700, isProjected: false },
-    ],
-    closingBalance: 5577,
-    riskLevel: 'warning',
-  },
-  {
-    day: 6,
-    date: '06/04',
-    entries: [
-      { type: 'daily_expense', amount: -7800, isProjected: false },
-    ],
-    closingBalance: -2223,
-    riskLevel: 'danger',
-  },
-  {
-    day: 7,
-    date: '07/04',
-    entries: [
-      { type: 'daily_expense', amount: -4200, isProjected: false },
-      { type: 'daily_expense', amount: -3100, isProjected: false },
-    ],
-    closingBalance: -9523,
-    riskLevel: 'danger',
-  },
-  {
-    day: 8,
-    date: '08/04',
-    entries: [
-      { type: 'daily_expense', amount: -5333, isProjected: true },
-    ],
-    closingBalance: -14856,
-    riskLevel: 'danger',
-  },
-  {
-    day: 9,
-    date: '09/04',
-    entries: [
-      { type: 'daily_expense', amount: -2900, isProjected: false },
-    ],
-    closingBalance: -17756,
-    riskLevel: 'danger',
-  },
-  {
-    day: 10,
-    date: '10/04',
-    entries: [
-      { type: 'income', amount: 150000, isProjected: false },
-      { type: 'daily_expense', amount: -6400, isProjected: false },
-      { type: 'fixed_expense', amount: -49900, isProjected: false },
-    ],
-    closingBalance: 75944,
-    riskLevel: 'safe',
-  },
-  {
-    day: 11,
-    date: '11/04',
-    entries: [
-      { type: 'daily_expense', amount: -9800, isProjected: false },
-      { type: 'daily_expense', amount: -4500, isProjected: false },
-    ],
-    closingBalance: 61644,
-    riskLevel: 'safe',
-  },
-  {
-    day: 12,
-    date: '12/04',
-    entries: [
-      { type: 'daily_expense', amount: -12300, isProjected: false },
-      { type: 'saving', amount: -20000, isProjected: false },
-    ],
-    closingBalance: 29344,
-    riskLevel: 'warning',
-  },
-  {
-    day: 13,
-    date: '13/04',
-    entries: [
-      { type: 'daily_expense', amount: -7600, isProjected: false },
-    ],
-    closingBalance: 21744,
-    riskLevel: 'warning',
-  },
-  {
-    day: 14,
-    date: '14/04',
-    entries: [
-      { type: 'daily_expense', amount: -5333, isProjected: true },
-    ],
-    closingBalance: 16411,
-    riskLevel: 'warning',
-  },
-  {
-    day: 15,
-    date: '15/04',
-    entries: [
-      { type: 'fixed_expense', amount: -35000, isProjected: false },
-      { type: 'daily_expense', amount: -8900, isProjected: false },
-    ],
-    closingBalance: -27489,
-    riskLevel: 'danger',
-  },
-  {
-    day: 16,
-    date: '16/04',
-    entries: [
-      { type: 'daily_expense', amount: -3200, isProjected: false },
-      { type: 'daily_expense', amount: -5100, isProjected: false },
-    ],
-    closingBalance: -35789,
-    riskLevel: 'danger',
-  },
-  {
-    day: 17,
-    date: '17/04',
-    entries: [
-      { type: 'daily_expense', amount: -5333, isProjected: true },
-    ],
-    closingBalance: -41122,
-    riskLevel: 'danger',
-  },
-  {
-    day: 18,
-    date: '18/04',
-    entries: [
-      { type: 'daily_expense', amount: -6700, isProjected: false },
-      { type: 'credit_card', amount: -28500, isProjected: false },
-    ],
-    closingBalance: -76322,
-    riskLevel: 'danger',
-  },
-  {
-    day: 19,
-    date: '19/04',
-    entries: [
-      { type: 'daily_expense', amount: -4100, isProjected: false },
-    ],
-    closingBalance: -80422,
-    riskLevel: 'danger',
-  },
-  {
-    day: 20,
-    date: '20/04',
-    entries: [
-      { type: 'income', amount: 320000, isProjected: false },
-      { type: 'fixed_expense', amount: -150000, isProjected: false },
-    ],
-    closingBalance: 89578,
-    riskLevel: 'safe',
-  },
-  {
-    day: 21,
-    date: '21/04',
-    entries: [
-      { type: 'daily_expense', amount: -11200, isProjected: false },
-      { type: 'daily_expense', amount: -3800, isProjected: false },
-    ],
-    closingBalance: 74578,
-    riskLevel: 'safe',
-  },
-  {
-    day: 22,
-    date: '22/04',
-    entries: [
-      { type: 'daily_expense', amount: -5333, isProjected: true },
-    ],
-    closingBalance: 69245,
-    riskLevel: 'safe',
-  },
-  {
-    day: 23,
-    date: '23/04',
-    entries: [
-      { type: 'daily_expense', amount: -15600, isProjected: false },
-      { type: 'daily_expense', amount: -8900, isProjected: false },
-      { type: 'saving', amount: -30000, isProjected: false },
-    ],
-    closingBalance: 14745,
-    riskLevel: 'warning',
-  },
-  {
-    day: 24,
-    date: '24/04',
-    entries: [
-      { type: 'daily_expense', amount: -7200, isProjected: false },
-    ],
-    closingBalance: 7545,
-    riskLevel: 'warning',
-  },
-  {
-    day: 25,
-    date: '25/04',
-    entries: [
-      { type: 'fixed_expense', amount: -25000, isProjected: false },
-      { type: 'daily_expense', amount: -4300, isProjected: false },
-    ],
-    closingBalance: -21755,
-    riskLevel: 'danger',
-  },
-  {
-    day: 26,
-    date: '26/04',
-    entries: [
-      { type: 'daily_expense', amount: -5333, isProjected: true },
-    ],
-    closingBalance: -27088,
-    riskLevel: 'danger',
-  },
-  {
-    day: 27,
-    date: '27/04',
-    entries: [
-      { type: 'daily_expense', amount: -9100, isProjected: false },
-      { type: 'daily_expense', amount: -2800, isProjected: false },
-    ],
-    closingBalance: -38988,
-    riskLevel: 'danger',
-  },
-  {
-    day: 28,
-    date: '28/04',
-    entries: [
-      { type: 'daily_expense', amount: -5333, isProjected: true },
-    ],
-    closingBalance: -44321,
-    riskLevel: 'danger',
-  },
-  {
-    day: 29,
-    date: '29/04',
-    entries: [
-      { type: 'daily_expense', amount: -6800, isProjected: false },
-      { type: 'credit_card', amount: -18700, isProjected: false },
-    ],
-    closingBalance: -69821,
-    riskLevel: 'danger',
-  },
-  {
-    day: 30,
-    date: '30/04',
-    entries: [
-      { type: 'daily_expense', amount: -5333, isProjected: true },
-    ],
-    closingBalance: -75154,
-    riskLevel: 'danger',
-  },
+  // Day 1: starting balance R$ -8.229,36
+  row(1, -822936),
+  // Day 2: -822936 - 5333 = -828269
+  row(2, -828269),
+  // Day 3: -828269 - 5333 = -833602
+  row(3, -833602),
+  // Day 4: -833602 - 5333 = -838935
+  row(4, -838935),
+  // Day 5: user spent R$ 42.10 (real expense)
+  row(5, -843145, 'danger', { daily_expense: { amountCents: 4210, isProjected: false } }),
+  // Day 6: -843145 - 5333 = -848478
+  row(6, -848478),
+  // Day 7: small freelance income R$ 150.00
+  row(7, -838811, 'danger', { income: { amountCents: 15000, isProjected: false } }),
+  // Day 8: -838811 - 5333 = -844144
+  row(8, -844144),
+  // Day 9: -844144 - 5333 = -849477
+  row(9, -849477),
+  // Day 10: internet bill R$ 99.90 + daily projected
+  row(10, -864300, 'danger', { fixed_expense: { amountCents: 9990, isProjected: false } }),
+  // Day 11: -864300 - 5333 = -869633
+  row(11, -869633),
+  // Day 12: groceries R$ 78.50
+  row(12, -877483, 'danger', { daily_expense: { amountCents: 7850, isProjected: false } }),
+  // Day 13: -877483 - 5333 = -882816
+  row(13, -882816),
+  // Day 14: -882816 - 5333 = -888149
+  row(14, -888149),
+  // Day 15: salary R$ 3.200,00 + credit card R$ 890,00
+  row(15, -857149, 'danger', {
+    income: { amountCents: 320000, isProjected: false },
+    credit_card: { amountCents: 89000, isProjected: false },
+  }),
+  // Day 16: -857149 - 5333 = -862482
+  row(16, -862482),
+  // Day 17: saving R$ 50.00
+  row(17, -872815, 'danger', { saving: { amountCents: 5000, isProjected: false } }),
+  // Day 18: -872815 - 5333 = -878148
+  row(18, -878148),
+  // Day 19: lunch R$ 31.90
+  row(19, -881338, 'danger', { daily_expense: { amountCents: 3190, isProjected: false } }),
+  // Day 20: -881338 - 5333 = -886671
+  row(20, -886671),
+  // Day 21: -886671 - 5333 = -892004
+  row(21, -892004),
+  // Day 22: phone plan R$ 55.00 + daily projected
+  row(22, -902837, 'danger', { fixed_expense: { amountCents: 5500, isProjected: false } }),
+  // Day 23: -902837 - 5333 = -908170
+  row(23, -908170),
+  // Day 24: Christmas eve dinner R$ 120.00
+  row(24, -920170, 'danger', { daily_expense: { amountCents: 12000, isProjected: false } }),
+  // Day 25: Christmas - no spending, projected daily only
+  row(25, -925503),
+  // Day 26: -925503 - 5333 = -930836
+  row(26, -930836),
+  // Day 27: side gig income R$ 80.00
+  row(27, -928169, 'danger', { income: { amountCents: 8000, isProjected: false } }),
+  // Day 28: -928169 - 5333 = -933502
+  row(28, -933502),
+  // Day 29: gas R$ 65.00
+  row(29, -940002, 'danger', { daily_expense: { amountCents: 6500, isProjected: false } }),
+  // Day 30: -940002 - 5333 = -945335
+  row(30, -945335),
+  // Day 31: New Year's Eve credit card R$ 200.00 + daily projected
+  row(31, -970668, 'danger', { credit_card: { amountCents: 20000, isProjected: false } }),
 ];

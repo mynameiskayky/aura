@@ -1,7 +1,4 @@
-export interface HorizonMonth {
-  monthLabel: string;
-  dailyBalances: number[];
-}
+import type { HorizonMonth } from '../core/types';
 
 export const MOCK_HORIZON: HorizonMonth[] = [
   {
