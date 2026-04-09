@@ -1,0 +1,56 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './app/**/*.{js,jsx,ts,tsx}',
+    './src/**/*.{js,jsx,ts,tsx}',
+  ],
+  presets: [require('nativewind/preset')],
+  theme: {
+    extend: {
+      colors: {
+        app: '#1E1E1E',
+        panel: '#242424',
+        elevated: '#2B2B2B',
+        'border-subtle': 'rgba(255,255,255,0.08)',
+        'border-strong': 'rgba(255,255,255,0.14)',
+        'text-primary': '#F5F5F5',
+        'text-secondary': 'rgba(255,255,255,0.72)',
+        'text-muted': 'rgba(255,255,255,0.42)',
+        accent: '#FF6F2B',
+        income: '#5CBF6B',
+        'fixed-expense': '#E86A00',
+        daily: '#EC218B',
+        saving: '#9BE30C',
+        'credit-card': '#7B45F1',
+        'danger-balance': '#8F1D22',
+        'danger-balance-strong': '#A32127',
+        'warning-soft': '#D7AA31',
+        'info-soft': '#4B9DFF',
+      },
+      borderRadius: {
+        sm: '12px',
+        md: '16px',
+        lg: '24px',
+        xl: '30px',
+        pill: '999px',
+      },
+      spacing: {
+        s1: '6px',
+        s2: '10px',
+        s3: '16px',
+        s4: '20px',
+        s5: '28px',
+      },
+      fontSize: {
+        hero: ['54px', { lineHeight: '1.1', fontWeight: '800' }],
+        'hero-sm': ['30px', { lineHeight: '1.2', fontWeight: '800' }],
+        header: ['24px', { lineHeight: '1.3', fontWeight: '800' }],
+        'card-title': ['18px', { lineHeight: '1.4', fontWeight: '800' }],
+        body: ['15px', { lineHeight: '1.5', fontWeight: '500' }],
+        overline: ['13px', { lineHeight: '1.4', fontWeight: '700', letterSpacing: '0.05em' }],
+        tiny: ['11px', { lineHeight: '1.3', fontWeight: '600' }],
+      },
+    },
+  },
+  plugins: [],
+};
