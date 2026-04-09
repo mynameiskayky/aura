@@ -1,12 +1,12 @@
 import React, { useCallback } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
 import { Screen } from '@/components/ui';
 import { MonthHeader, TypeBadge, FilterRow } from '@/components/finance';
-import { MOCK_BALANCES } from '@/mocks/balances';
 import { formatCurrency } from '@/core/utils/currency';
 import { colors } from '@/theme/colors';
+import { useMonthlyProjection } from '@/features/finance/useMonthlyProjection';
 import type { DailyBalanceRow, DayTypeAmount, TransactionType } from '@/core/types';
 
 const TYPE_ORDER: TransactionType[] = [
@@ -27,7 +27,11 @@ const TypeRow = React.memo(function TypeRow({
   entry: DayTypeAmount;
 }) {
   const hasValue = entry.amountCents > 0;
-  const textColor = hasValue ? colors.textPrimary : 'rgba(255,255,255,0.28)';
+  const textColor = !hasValue
+    ? 'rgba(255,255,255,0.28)'
+    : entry.isProjected
+      ? colors.textSecondary
+      : colors.textPrimary;
 
   return (
     <View style={styles.typeRow}>
@@ -98,6 +102,7 @@ const DayGroup = React.memo(function DayGroup({
 
 export default function SaldosScreen() {
   const router = useRouter();
+  const { ledger, hasConfiguredProjection } = useMonthlyProjection();
 
   const renderItem = useCallback(
     ({ item }: { item: DailyBalanceRow }) => <DayGroup item={item} />,
@@ -112,12 +117,27 @@ export default function SaldosScreen() {
       {/* Horizontal divider */}
       <View style={styles.hDivider} />
 
-      <FlashList
-        data={MOCK_BALANCES}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.date}
-        ItemSeparatorComponent={HorizontalDivider}
-      />
+      {hasConfiguredProjection ? (
+        <FlashList
+          data={ledger}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.date}
+          ItemSeparatorComponent={HorizontalDivider}
+        />
+      ) : (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyTitle}>Configure a conta para iniciar a projeção</Text>
+          <Text style={styles.emptyBody}>
+            Defina saldo atual e diário mensal. Depois lance entradas, saídas, cartão e economia para o cálculo diário ficar real.
+          </Text>
+          <Pressable
+            onPress={() => router.push('/settings/account')}
+            style={styles.emptyButton}
+          >
+            <Text style={styles.emptyButtonText}>Configurar conta</Text>
+          </Pressable>
+        </View>
+      )}
     </Screen>
   );
 }
@@ -177,5 +197,36 @@ const styles = StyleSheet.create({
   hDivider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  emptyState: {
+    margin: 16,
+    padding: 20,
+    borderRadius: 20,
+    backgroundColor: colors.bgPanel,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    gap: 12,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  emptyBody: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.textSecondary,
+  },
+  emptyButton: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    backgroundColor: colors.accentPrimary,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  emptyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

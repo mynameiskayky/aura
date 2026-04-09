@@ -3,7 +3,6 @@ import { useState, useCallback } from 'react';
 import { FlashList } from '@shopify/flash-list';
 import { Screen, SearchField, Divider } from '@/components/ui';
 import { MonthHeader } from '@/components/finance';
-import { MOCK_TAGS } from '@/mocks/tags';
 import { formatCurrency } from '@/core/utils/currency';
 import type { TagItem } from '@/core/types';
 
@@ -25,7 +24,9 @@ function TagRow({ item }: { item: TagItem }) {
 export default function TagsScreen() {
   const [search, setSearch] = useState('');
 
-  const filtered = MOCK_TAGS.filter((tag) =>
+  const tags: TagItem[] = [];
+
+  const filtered = tags.filter((tag) =>
     tag.name.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -52,12 +53,24 @@ export default function TagsScreen() {
 
       <Divider />
 
-      <FlashList
-        data={filtered}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        ItemSeparatorComponent={() => <Divider className="ml-[52px]" />}
-      />
+      {filtered.length > 0 ? (
+        <FlashList
+          data={filtered}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          ItemSeparatorComponent={() => <Divider className="ml-[52px]" />}
+        />
+      ) : (
+        <View className="px-s3 py-s5">
+          <Text className="text-card-title font-extrabold text-text-primary">
+            Ainda sem tags reais
+          </Text>
+          <Text className="mt-2 text-body text-text-secondary">
+            Os mocks foram removidos. A próxima etapa aqui é cadastrar tags
+            nos lançamentos e consolidar os totais por tag de verdade.
+          </Text>
+        </View>
+      )}
     </Screen>
   );
 }

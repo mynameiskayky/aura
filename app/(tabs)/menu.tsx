@@ -1,4 +1,5 @@
 import { View, Text, ScrollView } from 'react-native';
+import { useRouter } from 'expo-router';
 import {
   Calculator,
   Tag,
@@ -12,7 +13,7 @@ import { Screen, ListItemRow, Divider, Pill } from '@/components/ui';
 import { colors } from '@/theme/colors';
 
 const MENU_ITEMS = [
-  { id: '1', icon: Calculator, label: 'Previsão de diário' },
+  { id: '1', icon: Calculator, label: 'Previsão de diário', route: '/settings/account' },
   { id: '2', icon: Tag, label: 'Categorias' },
   { id: '3', icon: Download, label: 'Exportar dados' },
   { id: '4', icon: Bell, label: 'Notificações' },
@@ -21,6 +22,8 @@ const MENU_ITEMS = [
 ];
 
 export default function MenuScreen() {
+  const router = useRouter();
+
   return (
     <Screen withTabBarInset>
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
@@ -51,7 +54,7 @@ export default function MenuScreen() {
               <ListItemRow
                 icon={<item.icon size={20} color={colors.textSecondary} />}
                 label={item.label}
-                onPress={() => {}}
+                onPress={item.route ? () => router.push(item.route as '/settings/account') : undefined}
               />
               {index < MENU_ITEMS.length - 1 && <Divider className="ml-[56px]" />}
             </View>

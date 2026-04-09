@@ -18,7 +18,7 @@ import type { TransactionTypeKey } from '@/core/constants/transaction-types';
 
 export function AddTransactionSheet() {
   const router = useRouter();
-  const { isAddSheetOpen, closeAddSheet } = useUIStore();
+  const { isAddSheetOpen, closeAddSheet, setSelectedAddType } = useUIStore();
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(420)).current;
 
@@ -62,6 +62,7 @@ export function AddTransactionSheet() {
   }, [animationConfig, isAddSheetOpen, overlayOpacity, translateY]);
 
   const handleTypePress = (type: TransactionTypeKey) => {
+    setSelectedAddType(type);
     closeAddSheet();
     router.push('/add');
   };

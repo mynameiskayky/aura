@@ -1,6 +1,30 @@
 export type TransactionType = 'income' | 'fixed_expense' | 'daily_expense' | 'saving' | 'credit_card';
 
 export type RiskLevel = 'safe' | 'warning' | 'danger';
+export type RecurrenceFrequency = 'monthly';
+
+export interface RecurrenceRule {
+  frequency: RecurrenceFrequency;
+  dayOfMonth: number;
+  endDate?: string | null;
+}
+
+export interface AccountConfig {
+  currentBalanceCents: number;
+  balanceAnchorDate: string;
+  monthlyDailyBudgetCents: number;
+  warningThresholdCents: number;
+  projectionMonths: number;
+}
+
+export interface FinancialEntry {
+  id: string;
+  type: TransactionType;
+  amountCents: number;
+  effectiveDate: string;
+  description?: string;
+  recurrence?: RecurrenceRule | null;
+}
 
 /** Each day has exactly 5 type rows (one per TransactionType) */
 export interface DayTypeAmount {
@@ -16,12 +40,17 @@ export interface DailyBalanceRow {
   date: string;
   /** Always 5 entries, one per type, in display order */
   types: [DayTypeAmount, DayTypeAmount, DayTypeAmount, DayTypeAmount, DayTypeAmount];
+  openingBalance: number;
   /** Closing balance in cents (can be negative) */
   closingBalance: number;
   riskLevel: RiskLevel;
 }
 
 export interface MonthlySummaryData {
+  currentBalance: number;
+  monthlyDailyBudget: number;
+  dailyBudgetTarget: number;
+  dailyProjectedRemaining: number;
   performance: number;
   performanceLabel: string;
   economized: number;
@@ -29,7 +58,6 @@ export interface MonthlySummaryData {
   costOfLife: number;
   costOfLifeLabel: string;
   dailyAverage: number;
-  dailyBudgetTarget: number;
   movements: Record<TransactionType, number>;
 }
 
