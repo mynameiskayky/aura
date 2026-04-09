@@ -1,6 +1,6 @@
 import { View, Text, Pressable, ScrollView, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react-native';
 import { Screen } from '@/components/ui';
 import { TypeBadge } from '@/components/finance';
@@ -29,13 +29,63 @@ function isValidDateInput(value: string) {
 
 export default function AddScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    entryId?: string | string[];
+    type?: string | string[];
+    date?: string | string[];
+  }>();
+  const entryIdParam = Array.isArray(params.entryId) ? params.entryId[0] : params.entryId;
+  const prefilledTypeParam = Array.isArray(params.type) ? params.type[0] : params.type;
+  const prefilledDateParam = Array.isArray(params.date) ? params.date[0] : params.date;
   const initialSelectedType = useUIStore((state) => state.selectedAddType);
-  const [selectedType, setSelectedType] = useState<TransactionTypeKey>(initialSelectedType);
-  const [amountStr, setAmountStr] = useState('0');
-  const [description, setDescription] = useState('');
-  const [effectiveDate, setEffectiveDate] = useState(formatDate(new Date()));
-  const [recurrence, setRecurrence] = useState<'none' | 'monthly'>('none');
   const addEntry = useFinanceStore((state) => state.addEntry);
+  const updateEntry = useFinanceStore((state) => state.updateEntry);
+  const existingEntry = useFinanceStore((state) =>
+    entryIdParam ? state.entries.find((entry) => entry.id === entryIdParam) : undefined,
+  );
+  const isEditing = Boolean(existingEntry);
+
+  type RecurrenceMode = 'none' | 'monthly';
+
+  const initialState = useMemo(
+    (): {
+      selectedType: TransactionTypeKey;
+      amountStr: string;
+      description: string;
+      effectiveDate: string;
+      recurrence: RecurrenceMode;
+    } => ({
+      selectedType: (
+        existingEntry?.type ??
+        (prefilledTypeParam && prefilledTypeParam in TRANSACTION_TYPES
+          ? (prefilledTypeParam as TransactionTypeKey)
+          : initialSelectedType)
+      ) as TransactionTypeKey,
+      amountStr: String(existingEntry?.amountCents ?? 0),
+      description: existingEntry?.description ?? '',
+      effectiveDate:
+        existingEntry?.effectiveDate ??
+        (prefilledDateParam && isValidDateInput(prefilledDateParam)
+          ? prefilledDateParam
+          : formatDate(new Date())),
+      recurrence: existingEntry?.recurrence?.frequency === 'monthly' ? 'monthly' : 'none',
+    }),
+    [existingEntry, initialSelectedType, prefilledDateParam, prefilledTypeParam],
+  );
+
+  const [selectedType, setSelectedType] = useState<TransactionTypeKey>(initialState.selectedType);
+  const [amountStr, setAmountStr] = useState(initialState.amountStr);
+  const [description, setDescription] = useState(initialState.description);
+  const [effectiveDate, setEffectiveDate] = useState(initialState.effectiveDate);
+  const [recurrence, setRecurrence] = useState<RecurrenceMode>(initialState.recurrence);
+
+  useEffect(() => {
+    setSelectedType(initialState.selectedType);
+    setAmountStr(initialState.amountStr);
+    setDescription(initialState.description);
+    setEffectiveDate(initialState.effectiveDate);
+    setRecurrence(initialState.recurrence);
+  }, [initialState]);
 
   const typeConfig = TRANSACTION_TYPES[selectedType];
   const amountCents = parseInt(amountStr, 10);
@@ -69,13 +119,20 @@ export default function AddScreen() {
           }
         : null;
 
-    addEntry({
+    const payload = {
       type: selectedType,
       amountCents,
       effectiveDate,
       description: description || typeConfig.label,
       recurrence: recurrenceRule,
-    });
+    };
+
+    if (existingEntry) {
+      updateEntry(existingEntry.id, payload);
+    } else {
+      addEntry(payload);
+    }
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.back();
   };
@@ -88,7 +145,7 @@ export default function AddScreen() {
           <X size={24} color={colors.textPrimary} />
         </Pressable>
         <Text className="text-card-title font-extrabold text-text-primary">
-          {typeConfig.label}
+          {isEditing ? `Editar ${typeConfig.label}` : typeConfig.label}
         </Text>
         <View className="w-10" />
       </View>
@@ -185,7 +242,7 @@ export default function AddScreen() {
           }}
         >
           <Text className="text-body font-bold text-white">
-            Adicionar {typeConfig.label}
+            {isEditing ? `Salvar ${typeConfig.label}` : `Adicionar ${typeConfig.label}`}
           </Text>
         </Pressable>
       </View>

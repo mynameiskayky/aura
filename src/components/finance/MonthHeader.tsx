@@ -7,6 +7,7 @@ import { useUIStore } from '@/stores/ui-store';
 
 interface MonthHeaderProps {
   onGridPress?: () => void;
+  onTodayPress?: () => void;
   showGrid?: boolean;
   className?: string;
 }
@@ -20,7 +21,11 @@ function CalendarIcon({ day }: { day: number }) {
       {/* Body */}
       <View
         className="w-[34px] flex-1 rounded-b-[6px] items-center justify-center"
-        style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
+        style={{
+          backgroundColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.16)',
+        }}
       >
         <Text className="text-[16px] font-extrabold text-text-primary leading-[18px]">
           {day}
@@ -57,7 +62,12 @@ function GridIcon() {
   );
 }
 
-export function MonthHeader({ onGridPress, showGrid = true, className = '' }: MonthHeaderProps) {
+export function MonthHeader({
+  onGridPress,
+  onTodayPress,
+  showGrid = true,
+  className = '',
+}: MonthHeaderProps) {
   const { selectedMonth, nextMonth, prevMonth, setSelectedMonth } = useUIStore();
 
   const monthLabel = format(selectedMonth, "MMM/yy", { locale: ptBR });
@@ -65,6 +75,7 @@ export function MonthHeader({ onGridPress, showGrid = true, className = '' }: Mo
 
   const goToToday = () => {
     setSelectedMonth(new Date());
+    onTodayPress?.();
   };
 
   return (

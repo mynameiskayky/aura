@@ -15,6 +15,7 @@ export interface AccountConfig {
   monthlyDailyBudgetCents: number;
   warningThresholdCents: number;
   projectionMonths: number;
+  dailyExpenseExcludedDates: string[];
 }
 
 export interface FinancialEntry {
@@ -33,6 +34,8 @@ export interface DayTypeAmount {
   amountCents: number;
   /** true = system-projected daily budget, not real spend */
   isProjected: boolean;
+  /** true = user explicitly marked this day as no daily spend */
+  isProjectionExcluded?: boolean;
 }
 
 export interface DailyBalanceRow {

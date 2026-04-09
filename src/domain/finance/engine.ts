@@ -175,6 +175,7 @@ function buildDayTypes(
   dailyBudgetCents: number,
   currentDate: Date,
   anchorDate: Date,
+  excludedDailyExpenseDates: Set<string>,
 ): [DayTypeAmount, DayTypeAmount, DayTypeAmount, DayTypeAmount, DayTypeAmount] {
   // ── Before anchor: no data exists ──
   if (isBefore(currentDate, anchorDate)) {
@@ -191,6 +192,8 @@ function buildDayTypes(
 
   const actualDailyExpense = totals.get('daily_expense') ?? 0;
   const hasRealDailyExpense = actualDailyExpense > 0;
+  const currentDateKey = formatDate(currentDate);
+  const isDailyProjectionExcluded = excludedDailyExpenseDates.has(currentDateKey);
 
   // Project daily budget on days from anchor onward when:
   // 1. No real daily expense was logged
@@ -198,6 +201,7 @@ function buildDayTypes(
   // 3. It's NOT the anchor date itself (anchor day = "today", user hasn't spent yet or will log)
   const shouldProjectDaily =
     !hasRealDailyExpense &&
+    !isDailyProjectionExcluded &&
     dailyBudgetCents > 0 &&
     !sameDay(currentDate, anchorDate);
 
@@ -211,6 +215,7 @@ function buildDayTypes(
             ? dailyBudgetCents
             : 0,
         isProjected: shouldProjectDaily,
+        isProjectionExcluded: isDailyProjectionExcluded && !hasRealDailyExpense,
       };
     }
 
@@ -253,6 +258,7 @@ export function buildDailyLedger(
   const dailyBudgetCents = computeDailyBudget(config.monthlyDailyBudgetCents);
   const monthStart = startOfMonth(selectedMonth);
   const monthEnd = endOfMonth(selectedMonth);
+  const excludedDailyExpenseDates = new Set(config.dailyExpenseExcludedDates);
 
   // Expand entries for the range we need
   const expandedEntries = expandEntriesForRange(entries, monthStart, monthEnd);
@@ -278,6 +284,7 @@ export function buildDailyLedger(
         dailyBudgetCents,
         cursor,
         anchorDate,
+        excludedDailyExpenseDates,
       );
       runningBalance += getNetEffect(types);
       cursor = addDays(cursor, 1);
@@ -325,6 +332,7 @@ export function buildDailyLedger(
         dailyBudgetCents,
         cursor,
         anchorDate,
+        excludedDailyExpenseDates,
       );
       const openingBalance = runningBalance;
       runningBalance += getNetEffect(types);

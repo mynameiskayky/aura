@@ -16,6 +16,7 @@ const initialConfig: AccountConfig = {
   monthlyDailyBudgetCents: 0,
   warningThresholdCents: 0,
   projectionMonths: 6,
+  dailyExpenseExcludedDates: [],
 };
 
 const initialEntries: FinancialEntry[] = [];
@@ -35,6 +36,19 @@ interface FinanceStore {
     description?: string;
     recurrence?: FinancialEntry['recurrence'];
   }) => void;
+  updateEntry: (
+    id: string,
+    patch: {
+      type: TransactionType;
+      amountCents: number;
+      effectiveDate: string;
+      description?: string;
+      recurrence?: FinancialEntry['recurrence'];
+    },
+  ) => void;
+  removeEntry: (id: string) => void;
+  excludeDailyProjection: (date: string) => void;
+  includeDailyProjection: (date: string) => void;
 }
 
 export const useFinanceStore = create<FinanceStore>((set) => ({
@@ -61,6 +75,10 @@ export const useFinanceStore = create<FinanceStore>((set) => ({
           partial.projectionMonths !== undefined
             ? Math.max(1, partial.projectionMonths)
             : state.accountConfig.projectionMonths,
+        dailyExpenseExcludedDates:
+          partial.dailyExpenseExcludedDates !== undefined
+            ? Array.from(new Set(partial.dailyExpenseExcludedDates)).sort()
+            : state.accountConfig.dailyExpenseExcludedDates,
       },
     })),
 
@@ -99,5 +117,46 @@ export const useFinanceStore = create<FinanceStore>((set) => ({
           recurrence: recurrence ?? null,
         },
       ],
+    })),
+
+  updateEntry: (id, patch) =>
+    set((state) => ({
+      entries: state.entries.map((entry) =>
+        entry.id !== id
+          ? entry
+          : {
+              ...entry,
+              type: patch.type,
+              amountCents: Math.max(0, Math.abs(patch.amountCents)),
+              effectiveDate: patch.effectiveDate,
+              description: patch.description?.trim() || undefined,
+              recurrence: patch.recurrence ?? null,
+            },
+      ),
+    })),
+
+  removeEntry: (id) =>
+    set((state) => ({
+      entries: state.entries.filter((entry) => entry.id !== id),
+    })),
+
+  excludeDailyProjection: (date) =>
+    set((state) => ({
+      accountConfig: {
+        ...state.accountConfig,
+        dailyExpenseExcludedDates: Array.from(
+          new Set([...state.accountConfig.dailyExpenseExcludedDates, date]),
+        ).sort(),
+      },
+    })),
+
+  includeDailyProjection: (date) =>
+    set((state) => ({
+      accountConfig: {
+        ...state.accountConfig,
+        dailyExpenseExcludedDates: state.accountConfig.dailyExpenseExcludedDates.filter(
+          (currentDate) => currentDate !== date,
+        ),
+      },
     })),
 }));
